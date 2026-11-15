@@ -12,3 +12,11 @@ RUN_DIR = DATA_DIR / "runs"
 MATRIX_VERSION = "type-matrix/2026.11"
 SAMPLE_KEYS = ("A", "B", "C")
 MAX_RUNS_KEPT = 200
+
+# 路径别名（结构搬层）：样例、版本化映射与运行记录
+ALIAS_SAMPLE_DIR = SAMPLE_DIR / "alias"
+ALIAS_SAMPLE_KEYS = ("D", "E")
+ALIAS_DIR = DATA_DIR / "aliases"
+ALIAS_RUN_DIR = DATA_DIR / "alias_runs"
+MAX_ALIAS_RUNS_KEPT = 200
+MAX_NEST_DEPTH = 8

@@ -83,6 +83,45 @@
   </div>
 </section>
 
+<section class="panel">
+  <div class="panel-head">
+    <h2>路径别名（结构搬层）</h2>
+    <div class="panel-actions">
+      <span class="tag">内置 2 组 · 原子发布</span>
+      <a class="btn secondary small" href="/aliases">去别名工作台</a>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="dense">
+      <thead>
+        <tr><th style="width:220px">样例 / 表</th><th>变更摘要</th><th style="width:210px">预期结论</th><th style="width:170px">操作</th></tr>
+      </thead>
+      <tbody>
+        {% for s in alias_samples %}
+        <tr>
+          <td>
+            <strong>{{ s.label }}</strong>
+            <div class="small muted mono">{{ s.table }}</div>
+          </td>
+          <td class="small">{{ s.description }}</td>
+          <td class="small">{{ s.expected }}</td>
+          <td class="nowrap">
+            <a class="btn small" href="/aliases?sample={{ s.key }}">用样例 {{ s.key }} 生成方案</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="panel-body tight">
+    <p class="small muted" style="margin:0">
+      字段在结构层级间搬迁后，同一份 Parquet 只存新路径：按 field_id 核对父级链 / 编号 / 类型，生成旧路径 → 新路径的别名；
+      冲突或缺失整批隔离（不把旧值读到相近列）；发布原子生效、失败保留旧版映射、同一冻结输入重试不新增版本。
+      已有 {{ alias_run_count }} 条别名方案记录。
+    </p>
+  </div>
+</section>
+
 <div class="split wide-left">
   <section class="panel">
     <div class="panel-head">

@@ -1,0 +1,22 @@
+{
+  "table": "dwd_events",
+  "fields": [
+    {"id": 1, "name": "event_id", "type": "string", "nullable": false, "default": null, "partition": false},
+    {"id": 2, "name": "event_time", "type": "timestamp", "nullable": false, "default": null, "partition": false},
+    {"id": 10, "name": "user", "type": "struct", "fields": [
+      {"id": 11, "name": "uid", "type": "int64", "nullable": false, "default": null, "partition": false}
+    ]},
+    {"id": 40, "name": "context", "type": "struct", "fields": [
+      {"id": 13, "name": "device", "type": "struct", "fields": [
+        {"id": 14, "name": "imei", "type": "int64", "nullable": true, "default": null, "partition": false},
+        {"id": 15, "name": "os", "type": "string", "nullable": true, "default": null, "partition": false}
+      ]},
+      {"id": 99, "name": "referrer", "type": "string", "nullable": true, "default": null, "partition": false},
+      {"name": "debug_flag", "type": "string", "nullable": true, "default": null, "partition": false}
+    ]},
+    {"id": 20, "name": "props", "type": "struct", "fields": [
+      {"id": 21, "name": "page", "type": "string", "nullable": true, "default": null, "partition": false}
+    ]},
+    {"id": 30, "name": "dt", "type": "date", "nullable": false, "default": null, "partition": true}
+  ]
+}

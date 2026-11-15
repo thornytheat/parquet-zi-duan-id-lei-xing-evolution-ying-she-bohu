@@ -162,4 +162,78 @@
     });
     sqlBlock.parentNode.insertBefore(copyBtn, sqlBlock.nextSibling);
   }
+
+  // ---- 6) 路径别名工作台：载入样例 + 生成方案 ----
+  var aliasPlanBtn = qs('#btn-alias-plan');
+  if (aliasPlanBtn) {
+    var aOld = qs('#alias-old');
+    var aNew = qs('#alias-new');
+    var aErr = qs('#alias-error-box');
+    var aOk = qs('#alias-ok-box');
+    var aSel = qs('#alias-sample-select');
+    var aHint = qs('#alias-sample-hint');
+    var aLoad = qs('#btn-alias-load');
+
+    function aHide() { if (aErr) aErr.hidden = true; if (aOk) aOk.hidden = true; }
+
+    if (aLoad && aSel && aOld && aNew) {
+      aLoad.addEventListener('click', async function () {
+        aHide();
+        try {
+          var res = await fetch('/api/aliases/samples/' + aSel.value);
+          var data = await res.json();
+          if (!res.ok) throw new Error(data.detail || ('HTTP ' + res.status));
+          aOld.value = data.old;
+          aNew.value = data.new;
+          if (aHint) aHint.textContent = data.description + '（预期：' + data.expected + '）';
+          if (aOk) { aOk.hidden = false; aOk.textContent = '已载入样例 ' + data.key + '：' + data.label; }
+        } catch (err) {
+          if (aErr) window.showError(aErr, err);
+        }
+      });
+    }
+
+    aliasPlanBtn.addEventListener('click', async function () {
+      aHide();
+      aliasPlanBtn.disabled = true;
+      aliasPlanBtn.textContent = '核对中…';
+      try {
+        var data = await window.postJSON('/api/aliases/plan', {
+          old: aOld ? aOld.value : '',
+          new: aNew ? aNew.value : ''
+        });
+        if (aOk) {
+          aOk.hidden = false;
+          aOk.textContent = '方案已生成（' + data.status + '），正在跳转方案页…';
+        }
+        window.location.href = data.redirect;
+      } catch (err) {
+        if (aErr) window.showError(aErr, err);
+      } finally {
+        aliasPlanBtn.disabled = false;
+        aliasPlanBtn.textContent = '生成方案';
+      }
+    });
+  }
+
+  // ---- 7) 别名方案页：发布 / 重试发布 ----
+  var publishBtn = qs('#btn-alias-publish');
+  if (publishBtn) {
+    publishBtn.addEventListener('click', async function () {
+      var box = qs('#publish-error-box');
+      if (box) box.hidden = true;
+      publishBtn.disabled = true;
+      publishBtn.textContent = '发布中…';
+      try {
+        var data = await window.postJSON('/api/aliases/publish', {
+          run_id: publishBtn.getAttribute('data-run-id')
+        });
+        window.location.reload();
+      } catch (err) {
+        if (box) window.showError(box, err);
+        publishBtn.disabled = false;
+        publishBtn.textContent = '发布生效';
+      }
+    });
+  }
 })();

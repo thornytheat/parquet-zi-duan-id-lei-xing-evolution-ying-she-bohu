@@ -1,0 +1,22 @@
+{
+  "samples": [
+    {
+      "key": "D",
+      "label": "D · 结构搬层（可发布）",
+      "table": "dwd_events",
+      "old": "d/old.json",
+      "new": "d/new.json",
+      "description": "事件表把 user.session_id 与 user.device.* 搬到 context 层，field_id 与类型全部保持一致，父级链完整。",
+      "expected": "validated / 4 条别名可发布"
+    },
+    {
+      "key": "E",
+      "label": "E · 冲突与缺失（整批隔离）",
+      "table": "dwd_events",
+      "old": "e/old.json",
+      "new": "e/new.json",
+      "description": "搬层同时 imei 被改成 int64、session_id 与 referrer 在新 schema 丢失、无 id 的 debug_flag 消失而相近列出现在 context 下。",
+      "expected": "quarantined / 冲突 1 + 缺失 3，不产出任何别名"
+    }
+  ]
+}

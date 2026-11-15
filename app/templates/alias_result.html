@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block title %}别名方案 {{ run.run_id }} · {{ app_name }}{% endblock %}
+{% block crumb %}别名方案{% endblock %}
+{% block meta %}<span class="dot {% if run.status == 'published' %}ok{% elif run.status == 'planned' %}warn{% else %}err{% endif %}"></span>{{ run.status_label }}{% if run.publish %} · {{ run.publish.version }}{% endif %}{% endblock %}
+{% block actions %}
+<a class="btn secondary small" href="/aliases">回别名工作台</a>
+<a class="btn secondary small" href="/api/aliases/runs/{{ run.run_id }}/alias.json">下载 alias.json</a>
+<a class="btn small" href="/api/aliases/runs/{{ run.run_id }}/rewrite.sql">下载 rewrite.sql</a>
+{% endblock %}
+{% block status_left %}run_id {{ run.run_id }} · 生成于 {{ run.created_at }} · 输入来源 {{ run.source }} · 冻结指纹 {{ run.fingerprint[:23] }}…{% endblock %}
+{% block status_right %}表 <code>{{ run.table }}</code> · 别名 {{ run.summary.aliases }} 条 · 冲突 {{ run.summary.conflicts }} · 缺失 {{ run.summary.missing }}{% endblock %}
+
+{% block content %}
+{% set plan = run.plan %}
+<div class="page-head">
+  <div>
+    <h1 class="page-title">别名方案 · <span class="mono">{{ run.run_id }}</span></h1>
+    <p class="page-sub">
+      表 <code>{{ run.table }}</code> · 生成于 {{ run.created_at }} · 输入来源 {{ run.source }} · 状态
+      {% if run.status == 'published' %}<span class="tag ok">已生效</span>
+      {% elif run.status == 'quarantined' %}<span class="tag err">已隔离</span>
+      {% elif run.status == 'publish_failed' %}<span class="tag err">发布失败</span>
+      {% else %}<span class="tag warn">待发布</span>{% endif %}
+      {% if run.publish %} · 版本 <code>{{ run.publish.version }}</code>{% if run.publish.reused %}（复用已有版本，未新增）{% endif %}{% endif %}
+    </p>
+  </div>
+  <div class="page-head-actions">
+    <a class="btn secondary small" href="/aliases">再生成一份方案</a>
+  </div>
+</div>
+
+<div class="kpi-strip">
+  <div class="kpi {% if plan.status == 'validated' %}ok{% else %}err{% endif %}">
+    <div class="k-label">核对结论</div>
+    <div class="k-value" style="font-size:15px">{{ plan.status_label }}</div>
+    <div class="k-note">父级链 / 编号 / 类型逐项核对</div>
+  </div>
+  <div class="kpi">
+    <div class="k-label">生效别名</div>
+    <div class="k-value">{{ plan.aliases|length }}</div>
+    <div class="k-note">搬迁候选 {{ plan.candidates|length }} 条</div>
+  </div>
+  <div class="kpi {% if plan.conflicts %}err{% endif %}">
+    <div class="k-label">冲突</div>
+    <div class="k-value">{{ plan.conflicts|length }}</div>
+    <div class="k-note">类型不一致 / 父级链断裂等</div>
+  </div>
+  <div class="kpi {% if plan.missing %}err{% endif %}">
+    <div class="k-label">缺失</div>
+    <div class="k-value">{{ plan.missing|length }}</div>
+    <div class="k-note">id 丢失 / 无 id 路径消失</div>
+  </div>
+  <div class="kpi {% if run.status == 'published' %}ok{% endif %}">
+    <div class="k-label">生效版本</div>
+    <div class="k-value" style="font-size:15px">{{ run.publish.version if run.publish else '—' }}</div>
+    <div class="k-note">{% if run.publish %}发布于 {{ run.publish.published_at }}{% else %}未发布{% endif %}</div>
+  </div>
+</div>
+
+<section class="panel">
+  <div class="panel-head">
+    <h2>发布</h2>
+    <div class="panel-actions">
+      {% if current %}<span class="tag ok">当前生效 {{ current.version }}</span>{% else %}<span class="tag">该表暂无生效映射</span>{% endif %}
+    </div>
+  </div>
+  <div class="panel-body tight">
+    {% if run.status == 'quarantined' %}
+    <div class="alert alert-error" role="alert" style="margin:0">
+      方案处于整批隔离状态：{{ plan.conflicts|length }} 条冲突、{{ plan.missing|length }} 条缺失。
+      不产出任何生效别名，也不能发布；旧值不会被读到相近列。消除下方问题后请重新生成方案。
+    </div>
+    {% elif run.status == 'published' %}
+    <div class="alert alert-info" style="margin:0">
+      已发布为版本 <code>{{ run.publish.version }}</code>{% if run.publish.rolled_back %}（切回历史版本，未新增）{% elif run.publish.reused %}（同一冻结输入复用，未新增版本）{% endif %}。
+      {% if current and current.fingerprint == run.fingerprint %}该版本即为当前生效映射。{% else %}注意：当前生效映射是 <code>{{ current.version if current else '无' }}</code>，本方案不是最新生效版本。{% endif %}
+    </div>
+    {% elif run.status == 'publish_failed' %}
+    <div class="alert alert-error" role="alert" style="margin:0">
+      上次发布失败，旧版映射保持生效（{% if current %}当前 <code>{{ current.version }}</code>{% else %}该表仍无生效映射{% endif %}）。
+      可直接重试：同一冻结输入不会新增版本。
+    </div>
+    <div id="publish-error-box" class="alert alert-error" role="alert" style="margin:8px 0 0" hidden></div>
+    {% else %}
+    <p class="small" style="margin:0">
+      方案已冻结（指纹 <code>{{ run.fingerprint[:23] }}…</code>）。发布原子生效：先写版本文件再切 current 指针，
+      失败保留旧版映射；同一冻结输入重试不新增版本。发布后旧报表即可按别名视图从原路径读到新路径的值。
+    </p>
+    <div id="publish-error-box" class="alert alert-error" role="alert" style="margin:8px 0 0" hidden></div>
+    {% endif %}
+  </div>
+  {% if run.status in ('planned', 'publish_failed') %}
+  <div class="panel-actions">
+    <button type="button" id="btn-alias-publish" data-run-id="{{ run.run_id }}">{{ '重试发布' if run.status == 'publish_failed' else '发布生效' }}</button>
+    <a class="btn secondary small" href="/aliases">返回工作台</a>
+  </div>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <h2>别名明细</h2>
+    <div class="panel-actions">
+      <span class="tag {% if plan.status == 'validated' %}ok{% else %}err{% endif %}">{{ plan.status_label }}</span>
+      <span class="tag">生效 {{ plan.aliases|length }} / 候选 {{ plan.candidates|length }}</span>
+    </div>
+  </div>
+  {% set rows = plan.aliases if plan.status == 'validated' else plan.candidates %}
+  {% if rows %}
+  <div class="table-wrap roomy">
+    <table class="dense">
+      <thead>
+        <tr><th style="width:44px">#</th><th style="width:64px">field_id</th><th>旧路径 → 新路径</th>
+          <th style="width:100px">类型</th><th>父级链（旧 ⇒ 新）</th></tr>
+      </thead>
+      <tbody>
+        {% for a in rows %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><code>{{ a.field_id }}</code></td>
+          <td><code>{{ a.old_path }}</code> → <code>{{ a.new_path }}</code>{% if a.is_struct %} <span class="tag">struct</span>{% endif %}</td>
+          <td class="small">{{ a.type }}</td>
+          <td class="small">{{ (a.old_parent_chain|join(' → ')) or '（顶层）' }} ⇒ {{ (a.new_parent_chain|join(' → ')) or '（顶层）' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if plan.status == 'quarantined' %}
+  <div class="panel-body tight">
+    <p class="small muted" style="margin:0">以上 {{ plan.candidates|length }} 条只是候选：整批隔离期间全部不生效。</p>
+  </div>
+  {% endif %}
+  {% else %}
+  <div class="empty" style="padding:14px">{% if plan.status == 'quarantined' %}没有任何通过核对的候选。{% else %}两版 schema 之间没有路径搬迁。{% endif %}</div>
+  {% endif %}
+</section>
+
+{% if plan.conflicts or plan.missing %}
+<section class="panel">
+  <div class="panel-head">
+    <h2>冲突与缺失（整批隔离原因）</h2>
+    <div class="panel-actions"><span class="tag err">冲突 {{ plan.conflicts|length }} · 缺失 {{ plan.missing|length }}</span></div>
+  </div>
+  <div class="table-wrap auto">
+    <table class="dense">
+      <thead><tr><th style="width:90px">类别</th><th style="width:170px">规则</th><th style="width:200px">字段</th><th>说明</th></tr></thead>
+      <tbody>
+        {% for c in plan.conflicts %}
+        <tr>
+          <td><span class="tag err">冲突</span></td>
+          <td><code>{{ c.code }}</code><div class="hint">{{ c.code_label }}</div></td>
+          <td><code>{{ c.old_path }}</code>{% if c.new_path %} → <code>{{ c.new_path }}</code>{% endif %}</td>
+          <td class="small">{{ c.text }}</td>
+        </tr>
+        {% endfor %}
+        {% for m in plan.missing %}
+        <tr>
+          <td><span class="tag err">缺失</span></td>
+          <td><code>{{ m.code }}</code><div class="hint">{{ m.code_label }}</div></td>
+          <td><code>{{ m.old_path }}</code></td>
+          <td class="small">{{ m.text }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+{% if plan.notes %}
+<section class="panel">
+  <div class="panel-head">
+    <h2>标注（不参与匹配）</h2>
+    <div class="panel-actions"><span class="tag">{{ plan.notes|length }} 条</span></div>
+  </div>
+  <div class="table-wrap auto">
+    <table class="dense">
+      <thead><tr><th style="width:180px">类别</th><th style="width:220px">字段</th><th>说明</th></tr></thead>
+      <tbody>
+        {% for n in plan.notes %}
+        <tr>
+          <td><span class="tag">{{ n.code_label }}</span></td>
+          <td><code>{{ n.field }}</code></td>
+          <td class="small">{{ n.text }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+<section class="panel">
+  <div class="panel-head">
+    <h2>下载产物</h2>
+    <div class="panel-actions">
+      <a class="btn secondary small" href="/api/aliases/runs/{{ run.run_id }}/alias.json">alias.json</a>
+      <a class="btn secondary small" href="/api/aliases/runs/{{ run.run_id }}/rewrite.sql">rewrite.sql</a>
+    </div>
+  </div>
+  <div class="panel-body tight">
+    <p class="small muted" style="margin:0 0 6px">
+      产物随本运行记录一次生成、不再重算：工作台预演、历史记录与下载内容对应同一次生效结果。
+      alias.json 供查询改写层消费（rewrite_map 旧路径→新路径、resolution_map field_id→新路径）；rewrite.sql 是旧报表可用的兼容视图。
+    </p>
+    <pre class="sql">{{ run.artifacts.rewrite_sql }}</pre>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <h2>冻结输入</h2>
+    <div class="panel-actions"><span class="tag">指纹 {{ run.fingerprint[:23] }}…</span></div>
+  </div>
+  <div class="panel-body tight">
+    <details class="help">
+      <summary>旧 schema（搬层前，解析后形态）</summary>
+      <pre class="sql">{{ run.input.old | tojson(indent=2) }}</pre>
+    </details>
+    <details class="help" style="margin-top:8px">
+      <summary>新 schema（搬层后，解析后形态）</summary>
+      <pre class="sql">{{ run.input.new | tojson(indent=2) }}</pre>
+    </details>
+  </div>
+</section>
+{% endblock %}
